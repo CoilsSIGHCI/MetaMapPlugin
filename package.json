@@ -1,0 +1,33 @@
+{
+  "name": "meta-map-plugin",
+  "version": "0.0.1",
+  "description": "The Obsidian plugin for Meta Map VR App.",
+  "main": "lib/main.js",
+  "license": "CC0-1.0",
+  "scripts": {
+    "build": "obsidian-plugin build src/main.ts",
+    "dev": "obsidian-plugin dev src/main.ts",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^4.1.5",
+    "jest": "^30.2.0",
+    "jiti": "2.6.1",
+    "ts-jest": "^29.4.6",
+    "obsidian-plugin-cli": "^0.4.3",
+    "obsidian": "obsidianmd/obsidian-api"
+  },
+  "dependencies": {
+    "json-rpc-2.0": "^1.7.0",
+    "ws": "^8.19.0"
+  },
+  "esbuild": {
+    "mainFields": [
+      "module",
+      "main"
+    ]
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}

@@ -36,3 +36,10 @@ export type SearchResponse = {
   query: string;
   results: SearchResult[];
 };
+
+export type CreateNoteResponse = {
+  path: string;
+  title: string;
+  mtime: number;
+  created: true;
+};

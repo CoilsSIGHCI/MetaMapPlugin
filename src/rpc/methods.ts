@@ -1,5 +1,6 @@
-import { App, TFile } from "obsidian";
+import { App, TFile, TFolder, normalizePath } from "obsidian";
 import type {
+  CreateNoteResponse,
   GraphEdge,
   GraphSnapshot,
   NotePreview,
@@ -29,6 +30,9 @@ export function registerRpcMethods(server: RpcServerLike) {
   server.addMethod("search.query", (params, ctx) =>
     rpcSearchQuery(params, ctx),
   );
+  // Keep both names for compatibility with current and future clients.
+  server.addMethod("note.create", (params, ctx) => rpcNoteCreate(params, ctx));
+  server.addMethod("createNote", (params, ctx) => rpcNoteCreate(params, ctx));
 }
 
 function rpcGraphGetSnapshot(
@@ -149,4 +153,64 @@ async function rpcSearchQuery(
   }
 
   return { query: q, results };
+}
+
+async function rpcNoteCreate(
+  params: unknown,
+  ctx: RpcServerParams,
+): Promise<CreateNoteResponse> {
+  const p = isRecord(params) ? params : {};
+  const rawPath = typeof p.path === "string" ? p.path.trim() : "";
+  const heading = typeof p.heading === "string" ? p.heading.trim() : "";
+  const body = typeof p.body === "string" ? p.body : "";
+
+  if (!rawPath) throw new Error("Missing params.path");
+  if (!heading) throw new Error("Missing params.heading");
+
+  const path = normalizePath(rawPath);
+  if (!path.toLowerCase().endsWith(".md")) {
+    throw new Error("params.path must end with .md");
+  }
+
+  const existing = ctx.app.vault.getAbstractFileByPath(path);
+  if (existing instanceof TFile) {
+    throw new Error(`File already exists: ${path}`);
+  }
+  if (existing && !(existing instanceof TFolder)) {
+    throw new Error(`Path already exists and is not a markdown file: ${path}`);
+  }
+
+  const folderPath = path.split("/").slice(0, -1).join("/");
+  if (folderPath) {
+    await ensureFolderPath(ctx.app, folderPath);
+  }
+
+  const content = `# ${heading}\n\n${body.trimEnd()}\n`;
+  const file = await ctx.app.vault.create(path, content);
+
+  return {
+    path: file.path,
+    title: file.basename,
+    mtime: file.stat?.mtime ?? 0,
+    created: true,
+  };
+}
+
+async function ensureFolderPath(app: App, folderPath: string): Promise<void> {
+  const segments = folderPath.split("/").filter(Boolean);
+  let current = "";
+
+  for (const segment of segments) {
+    current = current ? `${current}/${segment}` : segment;
+    const existing = app.vault.getAbstractFileByPath(current);
+
+    if (!existing) {
+      await app.vault.createFolder(current);
+      continue;
+    }
+
+    if (!(existing instanceof TFolder)) {
+      throw new Error(`Path segment is not a folder: ${current}`);
+    }
+  }
 }

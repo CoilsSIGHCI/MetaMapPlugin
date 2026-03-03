@@ -1,5 +1,6 @@
 import { App, TFile, TFolder, normalizePath } from "obsidian";
 import type {
+  AppendNoteResponse,
   CreateNoteResponse,
   GraphEdge,
   GraphSnapshot,
@@ -30,9 +31,9 @@ export function registerRpcMethods(server: RpcServerLike) {
   server.addMethod("search.query", (params, ctx) =>
     rpcSearchQuery(params, ctx),
   );
-  // Keep both names for compatibility with current and future clients.
   server.addMethod("note.create", (params, ctx) => rpcNoteCreate(params, ctx));
   server.addMethod("createNote", (params, ctx) => rpcNoteCreate(params, ctx));
+  server.addMethod("appendNote", (params, ctx) => rpcNoteAppend(params, ctx));
 }
 
 function rpcGraphGetSnapshot(
@@ -47,17 +48,14 @@ function rpcGraphGetSnapshot(
     return { version: graphVersion, changed: false };
   }
 
-  // Nodes: all markdown files
   const files = ctx.app.vault.getMarkdownFiles();
 
   const nodes = files.map((f) => {
     const cache = ctx.app.metadataCache.getFileCache(f);
     const tags = new Set<string>();
 
-    // Tags may appear in frontmatter and inline; cache.tags is commonly present
     if (cache?.tags) {
       for (const t of cache.tags) {
-        // cache.tags entries typically like { tag: "#foo", position: ... }
         if (t.tag) tags.add(t.tag.startsWith("#") ? t.tag.slice(1) : t.tag);
       }
     }
@@ -68,7 +66,6 @@ function rpcGraphGetSnapshot(
     return { id: f.path, path: f.path, title, mtime, tags: [...tags] };
   });
 
-  // Edges: resolvedLinks is a map of sourcePath -> { targetPath -> count }
   const resolved = (
     ctx.app.metadataCache as {
       resolvedLinks?: Record<string, Record<string, number>>;
@@ -131,8 +128,6 @@ async function rpcSearchQuery(
   const q = typeof p.q === "string" ? p.q.trim() : "";
   if (!q) throw new Error("Missing params.q");
 
-  // Obsidian has an internal search system, but APIs vary across versions.
-  // Safe prototype approach: simple substring search over markdown files (bounded).
   const limit = Math.min(Number(p.limit ?? 50), 200);
 
   const files = ctx.app.vault.getMarkdownFiles();
@@ -193,6 +188,33 @@ async function rpcNoteCreate(
     title: file.basename,
     mtime: file.stat?.mtime ?? 0,
     created: true,
+  };
+}
+
+async function rpcNoteAppend(
+  params: unknown,
+  ctx: RpcServerParams,
+): Promise<AppendNoteResponse> {
+  const p = isRecord(params) ? params : {};
+  const rawPath = typeof p.path === "string" ? p.path.trim() : "";
+  const text = typeof p.text === "string" ? p.text : "";
+
+  if (!rawPath) throw new Error("Missing params.path");
+
+  const path = normalizePath(rawPath);
+  const file = ctx.app.vault.getAbstractFileByPath(path);
+
+  if (!(file instanceof TFile)) {
+    throw new Error(`File not found: ${path}`);
+  }
+
+  await ctx.app.vault.append(file, text);
+
+  return {
+    path: file.path,
+    title: file.basename,
+    mtime: file.stat?.mtime ?? 0,
+    appended: true,
   };
 }
 

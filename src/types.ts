@@ -1,5 +1,5 @@
 export type GraphNode = {
-  id: string; // use vault path as stable id
+  id: string;
   path: string;
   title: string;
   mtime: number;
@@ -7,8 +7,8 @@ export type GraphNode = {
 };
 
 export type GraphEdge = {
-  source: string; // path
-  target: string; // path
+  source: string;
+  target: string;
   count: number;
 };
 
@@ -42,4 +42,11 @@ export type CreateNoteResponse = {
   title: string;
   mtime: number;
   created: true;
+};
+
+export type AppendNoteResponse = {
+  path: string;
+  title: string;
+  mtime: number;
+  appended: true;
 };
